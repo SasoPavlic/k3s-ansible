@@ -1,5 +1,13 @@
 ---
-k3s_version: v1.30.2+k3s2
+# 1. K3s version to install
+k3s_version: v1.30.13+k3s1
+# 2. IPs to include in the server TLS certificate
+server_tls_sans:
+  - 192.168.0.254    # VIP
+  - 192.168.0.103    # master node 1
+  - 192.168.0.104    # master node 2
+  - 192.168.0.105    # master node 3
+
 # this is the user that has ssh access to these machines
 ansible_user: ubuntu
 systemd_dir: /etc/systemd/system
@@ -72,13 +80,15 @@ extra_server_args: >-
   {{ extra_args }}
   {{ '--node-taint node-role.kubernetes.io/master=true:NoSchedule' if k3s_master_taint else '' }}
   {% if calico_iface is defined or cilium_iface is defined %}
-  --flannel-backend=none
-  --disable-network-policy
-  --cluster-cidr={{ cluster_cidr | default('10.52.0.0/16') }}
+  --flannel-backend=none --disable-network-policy --cluster-cidr={{ cluster_cidr }}
   {% endif %}
-  --tls-san {{ apiserver_endpoint }}
+  {%- for san in server_tls_sans %}
+  --tls-san {{ san }}
+  {%- endfor %}
   --disable servicelb
   --disable traefik
+  --cluster-signing-key-file /var/lib/rancher/k3s/server/tls/server-ca.key
+  --cluster-signing-cert-file /var/lib/rancher/k3s/server/tls/server-ca.crt
 
 extra_agent_args: >-
   {{ extra_args }}
